@@ -1,6 +1,4 @@
 import os
-import pdb
-import time
 import numpy as np
 import torch
 import roma
@@ -15,21 +13,16 @@ class WiLor(nn.Module):
     WiLor for Onnx
     """
 
-    def __init__(self, **kwargs):
-        super(WiLor, self).__init__()
+    def __init__(self, mano_model_path, mano_mean_path, focal_length=5000, image_size=256):
+        super().__init__()
         # Create VIT backbone
-        self.backbone = vit(**kwargs)
+        self.backbone = vit(mano_mean_path=mano_mean_path)
         # Create RefineNet head
         self.refine_net = RefineNet(feat_dim=1280, upscale=3)
-        mano_model_path = kwargs.get("mano_model_path", "")
         assert os.path.exists(mano_model_path), f"MANO model {mano_model_path} not exists!"
-        mano_cfg = {
-            "model_path": mano_model_path,
-            "create_body_pose": False
-        }
-        self.mano = MANO(**mano_cfg)
-        self.FOCAL_LENGTH = kwargs.get("focal_length", 5000)
-        self.IMAGE_SIZE = kwargs.get("image_size", 256)
+        self.mano = MANO(model_path=mano_model_path, create_body_pose=False)
+        self.FOCAL_LENGTH = focal_length
+        self.IMAGE_SIZE = image_size
         self.IMAGE_MEAN = torch.from_numpy(np.array([0.485, 0.456, 0.406]).reshape(1, 1, 1, 3))
         self.IMAGE_STD = torch.from_numpy(np.array([0.229, 0.224, 0.225])).reshape(1, 1, 1, 3)
 
@@ -53,7 +46,14 @@ class WiLor(nn.Module):
 
         pred_mano_params = self.refine_net(vit_out, temp_vertices, pred_cam, pred_mano_feats,
                                            focal_length)
-        mano_output = self.mano(**pred_mano_params, pose2rot=False)
+
+        mano_output = self.mano(
+            global_orient=pred_mano_params["global_orient"],
+            hand_pose=pred_mano_params["hand_pose"],
+            betas=pred_mano_params["betas"],
+            pred_cam=pred_mano_params["pred_cam"],
+            pose2rot=False
+        )
         pred_keypoints_3d = mano_output.joints
         pred_vertices = mano_output.vertices
 

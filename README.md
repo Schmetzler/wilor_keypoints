@@ -1,3 +1,31 @@
+# WiLoR_Keypoints:
+
+Module to make just the keypoint calculation. Stripped a little bit from original.
+You need to Downlaod some weight files and put it into a folder.
+You must set the weights folder in initialization:
+
+```python
+from wilor_keypoints import WILOR
+
+model = WILOR(weights_folder="./wilor_weights")
+# load an image
+result = model.predict(image)
+```
+
+## Install
+
+`pip install git+https://github.com/Schmetzler/wilor_keypoints.git`
+
+### Needed models (put everything in a folder)
+* YOLO Detector (detector.pt) (can be found [here](https://huggingface.co/warmshao/WiLoR-mini/blob/main/pretrained_models/detector.pt) \[I renamed it to `yolo_hands.pt`\])
+* `wilor.safetensors` file (you may also use the original ckpt file)
+* `MANO_RIGHT.pkl` can be found [here](https://mano.is.tue.mpg.de/) (I will not supply it as you should register on the website to download the model)
+* and `mano_mean_params.npz`
+
+I put everything together in a 7z file (wilor_model_weights.7z) on my Google Drive (besides MANO_RIGHT.pkl) so you can download everything from [there](https://drive.google.com/drive/folders/1hfLQhse5DP460Q-j0d-vG_obCVIsc9Bt?usp=drive_link).
+
+I use `torch.float8_e4m3fn` format for `wilor.safetensors` to save space, after loading it is transformed back to float16 again.
+
 ## WiLoR-mini: Simplifying WiLoR into a Python package
 
 **Original repository: [WiLoR](https://github.com/rolpotamias/WiLoR), thanks to the authors for sharing**

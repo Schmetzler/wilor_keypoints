@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/10/13
 # @Author  : wenshao
-# @Project : WiLoR-mini
+# @Project : wilor_keypoints
 # @FileName: setup.py
 
 from setuptools import setup, find_packages
@@ -15,8 +15,8 @@ github_deps = [req for req in requirements if req.startswith('git+')]
 regular_deps = [req for req in requirements if not req.startswith('git+')]
 
 setup(
-    name='wilor_mini',
-    version='1.1',
+    name='wilor_keypoints',
+    version='1.0',
     description='WiLoR python package',
     packages=find_packages(),
     install_requires=regular_deps,

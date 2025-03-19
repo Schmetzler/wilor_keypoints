@@ -1,75 +1,71 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2024/10/14
-# @Author  : wenshao
-# @Project : WiLoR-mini
-# @FileName: wilor_hand_pose3d_estimation_pipeline.py
-import pdb
 from skimage.filters import gaussian
 import torch
 import cv2
 from ultralytics import YOLO
-from huggingface_hub import hf_hub_download
 import os
 import numpy as np
 from tqdm import tqdm
 import logging
 
-from ..utils.logger import get_logger
-from ..models.wilor import WiLor
-from ..utils import utils
+from .utils import WeightsOnlyFalse
+from .utils.logger import get_logger
+from .models.wilor import WiLor
+from .utils import utils
+from safetensors.torch import load_model
 
-
-class WiLorHandPose3dEstimationPipeline:
-    def __init__(self, **kwargs):
-        self.verbose = kwargs.get("verbose", True)
+class WILOR:
+    def __init__(self, weights_folder, device=torch.device("cpu"), dtype=torch.float16, verbose=True, init_models=True):
+        self.verbose = verbose
         if self.verbose:
             self.logger = get_logger(self.__class__.__name__, lv=logging.INFO)
         else:
             self.logger = get_logger(self.__class__.__name__, lv=logging.ERROR)
-        self.init_models(**kwargs)
-
-    def init_models(self, **kwargs):
-        # default tot use CPU
-        self.device = kwargs.get("device", torch.device("cpu"))
-        self.dtype = kwargs.get("dtype", torch.float32)
+        
         self.FOCAL_LENGTH = 5000
         self.IMAGE_SIZE = 256
-        self.WILOR_MINI_REPO_ID = kwargs.get("WILOR_MINI_REPO_ID", "warmshao/WiLoR-mini")
-        wilor_pretrained_dir = kwargs.get("wilor_pretrained_dir",
-                                          os.path.join(os.path.dirname(__file__), ".."))
-        os.makedirs(wilor_pretrained_dir, exist_ok=True)
-        mano_mean_path = os.path.join(wilor_pretrained_dir, "pretrained_models", "mano_mean_params.npz")
-        if not os.path.exists(mano_mean_path):
-            self.logger.info(f"download mano mean npz {mano_mean_path} from huggingface")
-            hf_hub_download(repo_id=self.WILOR_MINI_REPO_ID, subfolder="pretrained_models",
-                            filename="mano_mean_params.npz",
-                            local_dir=wilor_pretrained_dir)
-        mano_model_path = os.path.join(wilor_pretrained_dir, "pretrained_models", "MANO_RIGHT.pkl")
-        if not os.path.exists(mano_model_path):
-            self.logger.info(f"download mano model {mano_model_path} from huggingface")
-            hf_hub_download(repo_id=self.WILOR_MINI_REPO_ID, subfolder="pretrained_models", filename="MANO_RIGHT.pkl",
-                            local_dir=wilor_pretrained_dir)
-        self.logger.info(f"loading WiLor model >>> ")
-        self.wilor_model = WiLor(mano_model_path=mano_model_path, mano_mean_path=mano_mean_path,
-                                 focal_length=self.FOCAL_LENGTH,
-                                 image_size=self.IMAGE_SIZE)
-        wilor_model_path = os.path.join(wilor_pretrained_dir, "pretrained_models", "wilor_final.ckpt")
-        if not os.path.exists(wilor_model_path):
-            self.logger.info(f"download wilor pretrained model {wilor_model_path} from huggingface")
-            hf_hub_download(repo_id=self.WILOR_MINI_REPO_ID, subfolder="pretrained_models", filename="wilor_final.ckpt",
-                            local_dir=wilor_pretrained_dir)
-        self.wilor_model.load_state_dict(torch.load(wilor_model_path)["state_dict"], strict=False)
-        self.wilor_model.eval()
-        self.wilor_model.to(self.device, dtype=self.dtype)
+        
+        self.wilor_weight_path = os.path.join(weights_folder, "wilor.safetensors")
+        self.mano_mean_path = os.path.join(weights_folder, "mano_mean_params.npz")
+        self.mano_model_path = os.path.join(weights_folder, "MANO_RIGHT.pkl")
+        self.yolo_weight_path = os.path.join(weights_folder, "yolo_hands.pt")
 
-        yolo_model_path = os.path.join(wilor_pretrained_dir, "pretrained_models", "detector.pt")
-        if not os.path.exists(yolo_model_path):
-            self.logger.info(f"download yolo pretrained model {wilor_model_path} from huggingface")
-            hf_hub_download(repo_id=self.WILOR_MINI_REPO_ID, subfolder="pretrained_models", filename="detector.pt",
-                            local_dir=wilor_pretrained_dir)
-        self.logger.info(f"loading Yolo hand detection model >>> ")
-        self.hand_detector = YOLO(yolo_model_path)
-        self.hand_detector.to(self.device)
+        if init_models:
+            self.init_models(device, dtype)
+
+    def init_models(self, device, dtype):
+        self.device = device
+        self.dtype = dtype
+
+        self.wilor_model = WiLor(
+            mano_model_path=self.mano_model_path, mano_mean_path=self.mano_mean_path,
+            focal_length=self.FOCAL_LENGTH, image_size=self.IMAGE_SIZE
+        )
+
+        if self.wilor_weight_path.endswith(".safetensors"):
+            if device is None:
+                device_ = "cpu"
+            elif isinstance(device, torch.device):
+                if not device.index is None:
+                    device_ = device.index
+                else:
+                    device_ = device.type
+            else:
+                device_ = device
+            load_model(self.wilor_model, self.wilor_weight_path, strict=False, device=device_)
+        else:
+            try:
+                state = torch.load(self.wilor_weight_path, weights_only=True)
+                self.wilor_model.load_state_dict(state, strict=False)
+            except Exception:
+                state = torch.load(self.wilor_weight_path, weights_only=False)["state_dict"]
+                self.wilor_model.load_state_dict(state, strict=False)
+        self.wilor_model.eval()
+        self.wilor_model.to(dtype=dtype)
+
+        with WeightsOnlyFalse():
+            self.hand_detector = YOLO(self.yolo_weight_path)
+        self.hand_detector.to(device)
+        
 
     @torch.no_grad()
     def predict(self, image, **kwargs):
@@ -145,7 +141,6 @@ class WiLorHandPose3dEstimationPipeline:
                                                      scaled_focal_length)
             wilor_output_i["pred_cam_t_full"] = pred_cam_t_full
             wilor_output_i["scaled_focal_length"] = scaled_focal_length
-            # 弱透视
             pred_keypoints_2d = utils.perspective_projection(wilor_output_i["pred_keypoints_3d"],
                                                              translation=pred_cam_t_full,
                                                              focal_length=np.array([scaled_focal_length] * 2)[None],
@@ -222,7 +217,6 @@ class WiLorHandPose3dEstimationPipeline:
                                                      scaled_focal_length)
             wilor_output_i["pred_cam_t_full"] = pred_cam_t_full
             wilor_output_i["scaled_focal_length"] = scaled_focal_length
-            # 弱透视
             pred_keypoints_2d = utils.perspective_projection(wilor_output_i["pred_keypoints_3d"],
                                                              translation=pred_cam_t_full,
                                                              focal_length=np.array([scaled_focal_length] * 2)[None],

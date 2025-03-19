@@ -6,7 +6,7 @@ from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
-from timm.models.layers import drop_path, to_2tuple, trunc_normal_
+from .timm_wrapper import drop_path, to_2tuple, trunc_normal_
 import os
 
 
@@ -28,7 +28,7 @@ def rot6d_to_rotmat(x: torch.Tensor) -> torch.Tensor:
     return torch.stack((b1, b2, b3), dim=-1)
 
 
-def vit(**kwargs):
+def vit(mano_mean_path):
     return ViT(
         img_size=(256, 192),
         patch_size=16,
@@ -40,7 +40,7 @@ def vit(**kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         drop_path_rate=0.55,
-        **kwargs
+        mano_mean_path=mano_mean_path
     )
 
 
@@ -192,7 +192,7 @@ class PatchEmbed(nn.Module):
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=(patch_size[0] // ratio),
                               padding=4 + 2 * (ratio // 2 - 1))
 
-    def forward(self, x, **kwargs):
+    def forward(self, x):
         B, C, H, W = x.shape
         x = self.proj(x)
         Hp, Wp = x.shape[2], x.shape[3]
@@ -241,7 +241,7 @@ class ViT(nn.Module):
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., hybrid_backbone=None, norm_layer=None, use_checkpoint=False,
                  frozen_stages=-1, ratio=1, last_norm=True,
-                 patch_padding='pad', freeze_attn=False, freeze_ffn=False, **kwargs
+                 patch_padding='pad', freeze_attn=False, freeze_ffn=False, mano_mean_path=None
                  ):
         # Protect mutable default arguments
         super(ViT, self).__init__()
@@ -269,7 +269,6 @@ class ViT(nn.Module):
         self.NUM_HAND_JOINTS = 15
         npose = self.joint_rep_dim * (self.NUM_HAND_JOINTS + 1)
         self.npose = npose
-        mano_mean_path = kwargs.get("mano_mean_path", None)
         assert mano_mean_path and os.path.exists(mano_mean_path), f"{mano_mean_path} not exists!"
         mean_params = np.load(mano_mean_path)
         init_cam = torch.from_numpy(mean_params['cam'].astype(np.float32)).unsqueeze(0)
