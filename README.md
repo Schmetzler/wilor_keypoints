@@ -7,7 +7,7 @@ You must set the weights folder in initialization:
 ```python
 from wilor_keypoints import WILOR
 
-model = WILOR(weights_folder="./wilor_weights")
+model = WILOR(weights_folder="./weights_folder")
 # load an image
 result = model.predict(image)
 ```
@@ -25,6 +25,26 @@ result = model.predict(image)
 I put everything together in a 7z file (wilor_model_weights.7z) on my Google Drive (besides MANO_RIGHT.pkl) so you can download everything from [there](https://drive.google.com/drive/folders/1hfLQhse5DP460Q-j0d-vG_obCVIsc9Bt?usp=drive_link).
 
 I use `torch.float8_e4m3fn` format for `wilor.safetensors` to save space, after loading it is transformed back to float16 again.
+
+The file structure should look like this:
+```
+|--weights_folder
+   |--wilor.safetensors
+   |--MANO_RIGHT.pkl
+   |--mano_mean_params.npz
+   |--yolo_hands.pt
+```
+You can change the models if you do something like this:
+
+```python
+import torch
+from wilor_keypoints import WILOR
+model = WILOR("weights_folder/", init_models=False)
+model.wilor_weight_path = <PATH_TO_OTHER_FILE>
+model.yolo_weight_path = <PATH_TO_OTHER_YOLO_CHECKPOINT_FILE>
+# you have to init the models manually
+model.init_models(device="cpu", dtype=torch.float16)
+```
 
 ## WiLoR-mini: Simplifying WiLoR into a Python package
 

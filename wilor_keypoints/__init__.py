@@ -14,7 +14,7 @@ from .utils import utils
 from safetensors.torch import load_model
 
 class WILOR:
-    def __init__(self, weights_folder, device=torch.device("cpu"), dtype=torch.float16, verbose=True, init_models=True):
+    def __init__(self, weights_folder, device=torch.device("cpu"), dtype=torch.float16, init_models=True, verbose=False):
         self.verbose = verbose
         if self.verbose:
             self.logger = get_logger(self.__class__.__name__, lv=logging.INFO)
@@ -60,7 +60,7 @@ class WILOR:
                 state = torch.load(self.wilor_weight_path, weights_only=False)["state_dict"]
                 self.wilor_model.load_state_dict(state, strict=False)
         self.wilor_model.eval()
-        self.wilor_model.to(dtype=dtype)
+        self.wilor_model.to(dtype=dtype, device=device)
 
         with WeightsOnlyFalse():
             self.hand_detector = YOLO(self.yolo_weight_path)
