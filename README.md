@@ -46,30 +46,15 @@ model.yolo_weight_path = <PATH_TO_OTHER_YOLO_CHECKPOINT_FILE>
 model.init_models(device="cpu", dtype=torch.float16)
 ```
 
-## WiLoR-mini: Simplifying WiLoR into a Python package
+## Funding
 
-**Original repository: [WiLoR](https://github.com/rolpotamias/WiLoR), thanks to the authors for sharing**
+The work was conducted as part of the research project **KI-StudiUm** at the [**Westsächsische Hochschule Zwickau**](https://www.whz.de/english/), which was funded by the [**Federal Ministry of Research, Technology and Space**](https://www.bmftr.bund.de/EN/Home/home_node.html) as part of the federal-state initiative "KI in der Hochschulbildung" under the funding code `16DHBKI063`.
 
-I have simplified WiLoR, focusing on the inference process. Now it can be installed via pip and used directly, and it will automatically download the model.
-
-### How to use?
-* install: `pip install git+https://github.com/warmshao/WiLoR-mini`
-* Usage:
-```python
-import torch
-import cv2
-from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import WiLorHandPose3dEstimationPipeline
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-dtype = torch.float16
-
-pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype)
-img_path = "assets/img.png"
-image = cv2.imread(img_path)
-image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-outputs = pipe.predict(image)
-
-```
-For more usage examples, please refer to: `tests/test_pipelines.py`
-
-### Demo
-<video src="https://github.com/user-attachments/assets/ca7329fe-0b66-4eb6-87a5-4cb5cbe9ec43" controls="controls" width="300" height="500">您的浏览器不支持播放该视频！</video>
+<picture>
+     <source srcset="assets/bmftr-en-dark.svg" media="(prefers-color-scheme: dark)">
+     <img src="assets/bmftr-en-light.svg" height="75px">
+</picture>
+<picture>
+     <source srcset="assets/whz-en-dark.svg" media="(prefers-color-scheme: dark)">
+     <img src="assets/whz-en-light.svg" height="75px">
+</picture>
